@@ -111,21 +111,29 @@ switch method
     case 'dual'
          v = G'*ones(T,1);
         thr = sn*sqrt(T);
-        if bas_est
-            c = [G\max(G*y,0);0];
-            myfun = @(Ald) lagrangian_temporal_grad_bas(Ald,thr^2,y);
-            nvar = 2;
-        else
-            myfun = @(Ald) lagrangian_temporal_grad(Ald,thr^2,y-b);
-            nvar = 1;
-        end
+        nvar = 1 + bas_est + c1_est;
+        if bas_est; b = 0; end
+        if c1_est; c1 = 0; end
+        myfun = @(Ald) lagrangian_temporal_gradient(Ald,thr^2,y-b-c1*gd_vec,bas_est,c1_est);
+        c = [G\max(G*y,0);zeros(bas_est);zeros(c1_est)];
+%         if bas_est
+%             c = [G\max(G*y,0);0];
+%             myfun = @(Ald) lagrangian_temporal_grad_bas(Ald,thr^2,y);
+%             nvar = 2;
+%         else
+%             myfun = @(Ald) lagrangian_temporal_grad(Ald,thr^2,y-b);
+%             nvar = 1;
+%         end
         options_dual = optimset('GradObj','On','Display','Off','Algorithm','interior-point','TolX',1e-6);
         ld_in = 10*ones(nvar,1);
-        ld = fmincon(myfun,ld_in,[],[],[],[],zeros(nvar,1),[],[],options_dual);
-        if bas_est
-            b = c(end);
-            c = c(1:T);
-        end
+        ld = fmincon(myfun,ld_in,[],[],[],[],zeros(nvar,1),[],[],options_dual);        
+        if bas_est; b = c(T+bas_est); end
+        if c1_est; c1 = c(end); end
+%         if bas_est
+%             b = c(end);
+%             c = c(1:T);
+%         end
+        c = c(1:T);
         sp = G*c;
     case 'cvx'
         onPath = ~isempty(strfind(pathCell, 'cvx'));
@@ -283,7 +291,22 @@ end
         grad = -grad;
     end
 
-
+    function [f,grad] = lagrangian_temporal_gradient(Al,thr,y_raw,bas_flag,c1_flag)
+        options_qp = optimset('Display','Off','Algorithm','interior-point-convex');
+        H = [speye(T),ones(T,bas_flag),gd_vec*ones(1,c1_flag);...
+            ones(bas_flag,T),T*ones(bas_flag),(1-gd^T)/(1-gd)*ones(c1_flag,bas_flag);...
+            (gd_vec*ones(1,c1_flag))',(1-gd^T)/(1-gd)*ones(c1_flag,bas_flag),(1-gd^(2*T))/(1-gd^2)*ones(c1_flag,c1_flag)];
+        %gv = [G'*ones(T,1);zeros(bas_flag+c1_flag,1)];
+        Ay = [y_raw;sum(y_raw)*ones(bas_flag);gd_vec'*y_raw*ones(c1_flag)];
+        c = quadprog(2*Al(1)*H,[v;-Al(1+(1:bas_flag+c1_flag))]-2*Al(1)*Ay,[-G,sparse(T,bas_flag+c1_flag);sparse(bas_flag+c1_flag,T),-speye(bas_flag+c1_flag)]...
+            ,[sparse(T,1);-b_lb*ones(bas_flag);zeros(c1_flag)],[],[],[],[],c,options_qp);
+        f = v'*c(1:T);    
+        grad = [sum((c(1:T)-y_raw - c(T+bas_flag)*bas_flag - c(end)*c1_flag).^2)-thr;(-c(T+bas_flag)+b_lb)*ones(bas_flag);-c(end)*ones(c1_flag)];
+        f = f + Al(:)'*grad;
+        f = -f;
+        grad = -grad;
+    end
+        
     function [f,grad] = lagrangian_temporal_grad_bas(Al,thr,y_raw)
         options_qp = optimset('Display','Off','Algorithm','interior-point-convex');
         H = [speye(T),ones(T,1);ones(1,T),T];
