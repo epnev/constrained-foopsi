@@ -301,7 +301,7 @@ end
         c = quadprog(2*Al(1)*H,[v;-Al(1+(1:bas_flag+c1_flag))]-2*Al(1)*Ay,[-G,sparse(T,bas_flag+c1_flag);sparse(bas_flag+c1_flag,T),-speye(bas_flag+c1_flag)]...
             ,[sparse(T,1);-b_lb*ones(bas_flag);zeros(c1_flag)],[],[],[],[],c,options_qp);
         f = v'*c(1:T);    
-        grad = [sum((c(1:T)-y_raw - c(T+bas_flag)*bas_flag - c(end)*c1_flag).^2)-thr;(-c(T+bas_flag)+b_lb)*ones(bas_flag);-c(end)*ones(c1_flag)];
+        grad = [sum((c(1:T)-y_raw - c(T+bas_flag)*bas_flag - c(end)*gd_vec*c1_flag).^2)-thr;(-c(T+bas_flag)+b_lb)*ones(bas_flag);-c(end)*ones(c1_flag)];
         f = f + Al(:)'*grad;
         f = -f;
         grad = -grad;
