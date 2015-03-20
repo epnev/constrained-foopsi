@@ -1,4 +1,4 @@
-function [c,b,g,sn,sp] = constrained_foopsi(y,b,g,sn,options)
+function [c,b,c1,g,sn,sp] = constrained_foopsi(y,b,c1,g,sn,options)
 % spike inference using a constrained foopsi approach:
 %      min    sum(sp)
 %    c,sp,b
@@ -11,16 +11,17 @@ function [c,b,g,sn,sp] = constrained_foopsi(y,b,g,sn,options)
 %   y:      raw fluorescence data (vector of length(T))
 %   c:      denoised calcium concentration (Tx1 vector)
 %   b:      baseline concentration (scalar)
+%  c1:      initial concentration (scalar)
 %   g:      discrete time constant(s) (scalar or 2x1 vector)
 %  sn:      noise standard deviation (scalar)
 %  sp:      spike vector (Tx1 vector)
 
 %   USAGE:
-%   [c,b,g,sn,sp] = constrained_foopsi(y,b,g,sn,OPTIONS)
-%   The parameters b,g,sn can be given or else are estimated from the data
+%   [c,b,cin,g,sn,sp] = constrained_foopsi(y,b,g,sn,OPTIONS)
+%   The parameters b,cin,g,sn can be given or else are estimated from the data
 
 %   OPTIONS: (stuct for specifying options)
-%         p: order for AR model, used when g is not given (default 1)
+%         p: order for AR model, used when g is not given (default 2)
 %    method: methods for performing spike inference
 %   available methods: 'dual' uses dual ascent (default)
 %                       'cvx' uses the cvx package available from cvxr.com
@@ -38,14 +39,17 @@ defoptions.noise_method = 'logmexp';    % method for which to estimate the noise
 defoptions.lags = 5;                    % number of extra lags when computing the AR coefficients
 defoptions.resparse = 0;                % number of times to re-sparse solution
 
-if nargin < 5
+if nargin < 6
     options = defoptions;
-    if nargin < 4
+    if nargin < 5
         sn = [];
-        if nargin < 3
+        if nargin < 4
             g = [];
-            if nargin < 2
-                b = [];
+            if nargin < 3
+                c1 = [];
+                if nargin < 2
+                    b = [];
+                end
             end
         end
     end
@@ -64,6 +68,11 @@ if isempty(b);
     bas_est = 1;
 else
     bas_est = 0;
+end
+if isempty(c1)
+    c1_est = 1;
+else
+    c1_est = 0;
 end
 if isempty(sn)
     sn = GetSn(y,options.noise_range,options.noise_method);
@@ -95,6 +104,8 @@ g = g(:);
 y = y(:);
 T = length(y);
 G = spdiags(ones(T,1)*[-g(end:-1:1)',1],-length(g):0,T,T);
+gd = max(roots([1,-g']));  % decay time constant for initial concentration
+gd_vec = gd.^((0:T-1)');
 
 switch method
     case 'dual'
@@ -122,50 +133,51 @@ switch method
             c = zeros(T,1+options.resparse);
             sp = zeros(T,1+options.resparse);
             bas = zeros(1+options.resparse,1);
+            cin = zeros(1+options.resparse,1);
             w_ = ones(T,1);
             for rep = 1:options.resparse+1
-                [c(:,rep),bas(rep)] = cvx_foopsi(y,b,sn,b_lb,G,w_);
+                [c(:,rep),bas(rep),cin(rep)] = cvx_foopsi(y,b,c1,sn,b_lb,g,w_);
                 sp(:,rep) = G*c(:,rep);                
                 w_ = 1./(max(sp(:,rep),0) + 1e-8);
             end
             sp(sp<1e-6) = 0;
             c = G\sp;
             b = bas;
+            c1 = cin;
         else
             error('CVX does not appear to be on the MATLAB path. It can be downloaded from cvxr.com \n');
         end
     case 'lars'
-         if bas_est
-            Ginv = [full(G\speye(T)),ones(T,1)];
-            [~, ~, spikes, ~, ~] = lars_regression_noise(y-b_lb, Ginv, 1, sn^2*T);
-            b = spikes(end) + b_lb;
-            %c = filter(1,[1;-g],spikes(1:T));
-            sp = spikes(1:T);
-            
-         else
-            Ginv = full(G\speye(T));
-            [~, ~, spikes, ~, ~] = lars_regression_noise(y-b, Ginv, 1, sn^2*T);
-            sp = spikes;
-         end
+         Ginv = [full(G\speye(T)),ones(T,bas_est),gd_vec*ones(1,c1_est)];
+         if bas_est; b = 0; end
+         if c1_est; c1 = 0; end    
+         [~, ~, spikes, ~, ~] = lars_regression_noise(y-b_lb*bas_est - b - c1*gd_vec, Ginv, 1, sn^2*T);
+         sp = spikes(1:T);
+         b = (spikes(T+bas_est)+b_lb)*bas_est + b*(1-bas_est);
+         c1 = spikes(end)*c1_est + c1*(1-c1_est);
          c = G\sp;
     case 'spgl1'
         onPath = ~isempty(strfind(pathCell, 'spgl1'));
         if onPath
-            Gx = @(x,mode) G_inv_mat(x,mode,T,g,bas_est);
+            Gx = @(x,mode) G_inv_mat(x,mode,T,g,gd_vec,bas_est,c1_est);
             c = zeros(T,1+options.resparse);
             sp = zeros(T,1+options.resparse);
             bas = zeros(1+options.resparse,1);
+            cin = zeros(1+options.resparse,1);
             w_ = ones(T,1);
             for rep = 1:options.resparse+1
                 if bas_est; b = 0; w_ = [w_;1e-10]; end
+                if c1_est; c1 = 0; w_ = [w_;1e-10]; end
                 options_spgl = spgSetParms('project',@NormL1NN_project ,'primal_norm', @NormL1NN_primal,'dual_norm',@NormL1NN_dual,'verbosity',0,'weights',w_);
-                [spikes,r,~,~] = spg_bpdn( Gx, y-b_lb*bas_est - (1-bas_est)*b, sn*sqrt(T),options_spgl);
+                [spikes,r,~,~] = spg_bpdn( Gx, y-b_lb*bas_est - (1-bas_est)*b-(1-c1_est)*c1*gd_vec, sn*sqrt(T),options_spgl);
                 c(:,rep) = Gx([spikes(1:T);0],1);                                  %% calcium signal
-                bas(rep) = b*(1-bas_est) + bas_est*spikes(end)+b_lb*bas_est;       %% baseline
+                bas(rep) = b*(1-bas_est) + bas_est*spikes(T+bas_est)+b_lb*bas_est;       %% baseline
+                cin(rep) = c1*(1-c1_est) + c1_est*spikes(end);
                 sp(:,rep) = spikes(1:T);                                           %% spiking signal
                 w_ = 1./(spikes(1:T)+1e-8);
             end
             b = bas;
+            c1 = cin;
             %sn = norm(r)/sqrt(T);
         else
             error('SPGL1 does not appear to be on the MATLAB path. It can be downloaded from math.ucdavis.edu/~mpf/spgl1 \n');
@@ -285,23 +297,13 @@ end
         grad = -grad;
     end
 
-    function b = G_inv_mat(x,mode,NT,gs,bas_flag)
+    function b = G_inv_mat(x,mode,NT,gs,gd_vec,bas_flag,c1_flag)
         if mode == 1
-            if bas_flag
-                b = filter(1,[1;-gs(:)],x(1:NT)) + x(end);
-                %b = G\x(1:T) + x(end);
-            else
-                b = filter(1,[1;-gs(:)],x(1:NT));
-                %b = G\x(1:T);
-            end
+            b = filter(1,[1;-gs(:)],x(1:NT)) + bas_flag*x(NT+bas_flag) + c1_flag*gd_vec*x(end);
+           %b = G\x(1:NT) + x(NT+bas_flag)*bas_flag + x(end)*c1_flag;
         elseif mode == 2
-            if bas_flag
-                b = [flipud(filter(1,[1;-gs(:)],flipud(x)));sum(x)];
-                %b = [G'\x;sum(x)] ;
-            else
-                b = flipud(filter(1,[1;-gs(:)],flipud(x)));
-                %b = G'\x;
-            end
+            b = [flipud(filter(1,[1;-gs(:)],flipud(x)));ones(bas_flag,1)*sum(x);ones(c1_flag,1)*(gd_vec'*x)];
+           %b = [G'\x;ones(bas_flag,1)*sum(x);ones(c1_flag,1)*(gd_vec'*x)] ;
         end
     end
 
