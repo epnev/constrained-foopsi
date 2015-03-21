@@ -1,11 +1,12 @@
 function [c,b,c1,g,sn,sp] = constrained_foopsi(y,b,c1,g,sn,options)
 % spike inference using a constrained foopsi approach:
-%      min    sum(sp)
-%    c,sp,b
+%      min      sum(sp)
+%    c,sp,b,c1
 %      subject to: sp >= 0
 %                   b >= 0
 %                  G*c = sp
-%           ||y-b-c|| <= sn*sqrt(T)
+%                   c1 >= 0
+%           ||y-b-c - c_in|| <= sn*sqrt(T)
 
 %   Variables:
 %   y:      raw fluorescence data (vector of length(T))
