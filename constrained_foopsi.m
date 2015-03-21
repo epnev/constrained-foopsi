@@ -111,21 +111,19 @@ switch method
     case 'dual'
          v = G'*ones(T,1);
         thr = sn*sqrt(T);
-        if bas_est
-            c = [G\max(G*y,0);0];
-            myfun = @(Ald) lagrangian_temporal_grad_bas(Ald,thr^2,y);
-            nvar = 2;
-        else
-            myfun = @(Ald) lagrangian_temporal_grad(Ald,thr^2,y-b);
-            nvar = 1;
+        if bas_est; b = 0; end
+        if c1_est; c1 = 0; end
+        myfun = @(Ald) lagrangian_temporal_gradient(Ald,thr^2,y-b-c1*gd_vec,bas_est,c1_est);
+        c = [G\max(G*y,0);zeros(bas_est);zeros(c1_est)];
+        options_dual = optimset('GradObj','On','Display','Off','Algorithm','interior-point','TolX',1e-8);
+        ld_in = 10;
+        [ld,~,flag] = fmincon(myfun,ld_in,[],[],[],[],0,[],[],options_dual);        
+        if (flag == -2) || (flag == -3)
+            warning('Problem seems unbounded or infeasible. Try a different method.');
         end
-        options_dual = optimset('GradObj','On','Display','Off','Algorithm','interior-point','TolX',1e-6);
-        ld_in = 10*ones(nvar,1);
-        ld = fmincon(myfun,ld_in,[],[],[],[],zeros(nvar,1),[],[],options_dual);
-        if bas_est
-            b = c(end);
-            c = c(1:T);
-        end
+        if bas_est; b = c(T+bas_est); end
+        if c1_est; c1 = c(end); end
+        c = c(1:T);
         sp = G*c;
     case 'cvx'
         onPath = ~isempty(strfind(pathCell, 'cvx'));
@@ -220,78 +218,79 @@ end
     end
 
 
-    function Zin = plain_foopsi(H,D,I_est,eps)
-
-        % solves argmin ||X-H||^2 subject to D*X>=0 with an interior point method
-        % using I_est as the initial value and eps as the initial barrier weight
-
-        ln = length(H);
-        step_back_frac = 0.5;
-        iter = 0;
-        if nargin == 2
-            I_est = 1e-3*ones(ln,1);
-            eps = 1;
-        end
-        Zin = I_est(:);
-
-        if nargin == 3
-            eps = 1;
-        end
-        while eps>1e-8
-            n = D*Zin;
-            nnd = 10;
-            E = norm(Zin-H)^2 - eps*sum(log(D*Zin));
-            grad = 2*(Zin-H) - eps*D'*(n.^(-1));
-            Hs = 2*speye(ln) + eps*D'*spdiags(n.^(-2),0,ln,ln)*D;          
-            while nnd/2>1
-                iter = iter + 1;
-                Z_dir = -Hs\grad;
-                hit = -n./(D*Z_dir);
-                if all(hit<0)
-                    s = 1;
-                else
-                    s = min(1,.9*min(hit(hit>=0)));
-                end
-                E_new = E; s = s/step_back_frac;
-                x_dg = grad'*Z_dir;
-                while E_new > E + 0.25*s*x_dg
-                    s=s*step_back_frac; 
-                    Z_new = Zin + s*Z_dir;
-                    n = D*Zin;
-                    E_new = norm(Z_new-H)^2 - eps*sum(log(D*Z_new));
-                end
-                %E = E_new;
-                Zin = Zin + s*Z_dir;
-                nnd = -x_dg;
-                E = norm(Zin-H)^2 - eps*sum(log(D*Zin));
-                n = D*Zin;
-                grad = 2*(Zin-H) - eps*D'*(n.^(-1));
-                Hs = 2*speye(ln) + eps*D'*spdiags(n.^(-2),0,ln,ln)*D;
-            end
-            eps = eps/10;
-        end
-    end
+%     function Zin = plain_foopsi(H,D,I_est,eps)
+% 
+%         % solves argmin ||X-H||^2 subject to D*X>=0 with an interior point method
+%         % using I_est as the initial value and eps as the initial barrier weight
+% 
+%         ln = length(H);
+%         step_back_frac = 0.5;
+%         iter = 0;
+%         if nargin == 2
+%             I_est = 1e-3*ones(ln,1);
+%             eps = 1;
+%         end
+%         Zin = I_est(:);
+% 
+%         if nargin == 3
+%             eps = 1;
+%         end
+%         while eps>1e-8
+%             n = D*Zin;
+%             nnd = 10;
+%             E = norm(Zin-H)^2 - eps*sum(log(D*Zin));
+%             grad = 2*(Zin-H) - eps*D'*(n.^(-1));
+%             Hs = 2*speye(ln) + eps*D'*spdiags(n.^(-2),0,ln,ln)*D;          
+%             while nnd/2>1
+%                 iter = iter + 1;
+%                 Z_dir = -Hs\grad;
+%                 hit = -n./(D*Z_dir);
+%                 if all(hit<0)
+%                     s = 1;
+%                 else
+%                     s = min(1,.9*min(hit(hit>=0)));
+%                 end
+%                 E_new = E; s = s/step_back_frac;
+%                 x_dg = grad'*Z_dir;
+%                 while E_new > E + 0.25*s*x_dg
+%                     s=s*step_back_frac; 
+%                     Z_new = Zin + s*Z_dir;
+%                     n = D*Zin;
+%                     E_new = norm(Z_new-H)^2 - eps*sum(log(D*Z_new));
+%                 end
+%                 %E = E_new;
+%                 Zin = Zin + s*Z_dir;
+%                 nnd = -x_dg;
+%                 E = norm(Zin-H)^2 - eps*sum(log(D*Zin));
+%                 n = D*Zin;
+%                 grad = 2*(Zin-H) - eps*D'*(n.^(-1));
+%                 Hs = 2*speye(ln) + eps*D'*spdiags(n.^(-2),0,ln,ln)*D;
+%             end
+%             eps = eps/10;
+%         end
+%     end
     
-    function [f,grad] = lagrangian_temporal_grad(Al,thr,y_raw)
-        %options2 = optimset('Display','Off','Algorithm','interior-point-convex');
-        %c = quadprog(2*sum(Al.*(a.^2))*speye(T),v-2*((la>1)*sum(spdiags(Al.*a,0,la,la)*y,1)' + (la==1)*y'*(Al.*a)),-G,zeros(T,1),[],[],[],[],[],options2);
-        c = plain_foopsi((y_raw*(Al)-v/2)/sum(Al),G);
-        f = v'*c;    
-        grad = (sum((c-y_raw).^2)-thr);
-        f = f + Al(:)'*grad;
-        f = -f;
-        grad = -grad;
-    end
+%     function [f,grad] = lagrangian_temporal_grad(Al,thr,y_raw)
+%         %options2 = optimset('Display','Off','Algorithm','interior-point-convex');
+%         %c = quadprog(2*sum(Al.*(a.^2))*speye(T),v-2*((la>1)*sum(spdiags(Al.*a,0,la,la)*y,1)' + (la==1)*y'*(Al.*a)),-G,zeros(T,1),[],[],[],[],[],options2);
+%         c = plain_foopsi((y_raw*(Al)-v/2)/sum(Al),G);
+%         f = v'*c;    
+%         grad = (sum((c-y_raw).^2)-thr);
+%         f = f + Al(:)'*grad;
+%         f = -f;
+%         grad = -grad;
+%     end
 
-
-    function [f,grad] = lagrangian_temporal_grad_bas(Al,thr,y_raw)
+    function [f,grad] = lagrangian_temporal_gradient(Al,thr,y_raw,bas_flag,c1_flag)
         options_qp = optimset('Display','Off','Algorithm','interior-point-convex');
-        H = [speye(T),ones(T,1);ones(1,T),T];
-        c = quadprog(2*Al(1)*H,[v;-Al(2)]-2*Al(1)*[y_raw;sum(y_raw)],[-G,sparse(T,1);sparse(1,T),-1],[sparse(T,1);-b_lb],[],[],[],[],c,options_qp);
-        %c = quadprog(2*sum(Al.*(a.^2))*speye(T),v-2*((la>1)*sum(spdiags(Al.*a,0,la,la)*y,1)' + (la==1)*y'*(Al.*a)),-G,zeros(T,1),[],[],[],[],[],options2);
-        %c = plain_foopsi((y_raw*(Al)-v/2)/sum(Al),G);
+        H = [speye(T),ones(T,bas_flag),gd_vec*ones(1,c1_flag);...
+            ones(bas_flag,T),T*ones(bas_flag),(1-gd^T)/(1-gd)*ones(c1_flag,bas_flag);...
+            (gd_vec*ones(1,c1_flag))',(1-gd^T)/(1-gd)*ones(c1_flag,bas_flag),(1-gd^(2*T))/(1-gd^2)*ones(c1_flag,c1_flag)];
+        Ay = [y_raw;sum(y_raw)*ones(bas_flag);gd_vec'*y_raw*ones(c1_flag)];
+        c = quadprog(2*Al(1)*H,[v;zeros(bas_flag+c1_flag,1)]-2*Al(1)*Ay,[-G,sparse(T,bas_flag+c1_flag);sparse(bas_flag+c1_flag,T),-speye(bas_flag+c1_flag)]...
+            ,[sparse(T,1);-b_lb*ones(bas_flag);zeros(c1_flag)],[],[],[],[],c,options_qp);
         f = v'*c(1:T);    
-        grad = [sum((c(1:T)-y_raw - c(end)).^2)-thr;-c(end)+b_lb];
+        grad = [sum((c(1:T)-y_raw + c(T+bas_flag)*bas_flag + c(end)*gd_vec*c1_flag).^2)-thr];
         f = f + Al(:)'*grad;
         f = -f;
         grad = -grad;
