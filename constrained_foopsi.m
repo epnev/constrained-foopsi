@@ -82,9 +82,9 @@ if isempty(g)
     while max(abs(roots([1,-g(:)']))>1)
         warning('No stable AR(%i) model found. Checking for AR(%i) model \n',options.p,options.p+1);
         options.p = options.p + 1;
-        g = estimate_time_constants(y,options.p,sn,lags);
+        g = estimate_time_constants(y,options.p,sn,options.lags);
     end
-    fprintf('Stable AR(%i) model found \n',options.p);
+    %fprintf('Stable AR(%i) model found \n',options.p);
 end
 if options.bas_nonneg  % lower bound for baseline
     b_lb = 0;
