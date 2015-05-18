@@ -191,6 +191,9 @@ end
     function sn = GetSn(Y,range_ff,method)
         % estimate noise level with a power spectral density method
         L=length(Y);
+%         if ~isempty(which('pmtm'))
+%             [psd_Y,ff] = pmtm(Y,5/2,1000,1);
+%         end
         if ~isempty(which('pwelch'));
             [psd_Y,ff]=pwelch(Y,round(L/8),[],1000,1);
         else
