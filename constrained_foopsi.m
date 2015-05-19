@@ -124,6 +124,11 @@ if strcmpi(method,'dual') && any(mis_data)
     method = 'cvx';
 end
 
+if options.resparse > 1 && (method =='dual' || method == 'lars')
+    warning('Resparsening is not supported with chosen method. Switching to CVX');
+    method = 'cvx';
+end
+
 pathCell = regexp(path, pathsep, 'split');
 g = g(:);
 G = spdiags(ones(T,1)*[-g(end:-1:1)',1],-length(g):0,T,T);
