@@ -35,6 +35,7 @@ function [c,b,c1,g,sn,sp] = constrained_foopsi(y,b,c1,g,sn,options)
 %   lags:         number of extra autocovariance lags to be considered when estimating the time constants
 %   resparse:     number of times that the solution is resparsened (default 0). Currently available only with methods 'cvx', 'spgl'
 
+
 % Written by Eftychios Pnevmatikakis 
 
 defoptions.p = 2;
@@ -80,11 +81,24 @@ if isempty(c1)
 else
     c1_est = 0;
 end
+
+y = y(:);
+T = length(y);
+y_full = y;
+mis_data = isnan(y);
+E = speye(T);
+E(mis_data,:) = [];
+
+if any(mis_data)
+    y_full(mis_data) = interp1(find(~mis_data),y(~mis_data),find(mis_data));
+end
+    
+
 if isempty(sn)
-    sn = GetSn(y,options.noise_range,options.noise_method);
+    sn = GetSn(y_full,options.noise_range,options.noise_method);
 end
 if isempty(g)
-    g = estimate_time_constants(y,options.p,sn,options.lags);
+    g = estimate_time_constants(y_full,options.p,sn,options.lags);
     while max(abs(roots([1,-g(:)']))>1)
         warning('No stable AR(%i) model found. Checking for AR(%i) model \n',options.p,options.p+1);
         options.p = options.p + 1;
@@ -102,13 +116,16 @@ if strcmpi(method,'dual'); method = 'dual';
 elseif strcmpi(method,'cvx'); method = 'cvx';
 elseif strcmpi(method,'lars'); method = 'lars';
 elseif strcmpi(method,'spgl1'); method = 'spgl1';
-else fprintf('Invalid choice of method. Using dual ascent. \n'); method = 'dual';
+else fprintf('Invalid choice of method. Using CVX \n'); method = 'cvx';
 end
-    
+
+if strcmpi(method,'dual') && any(mis_data)
+    warning('Dual method does not support missing data. Switching to CVX');
+    method = 'cvx';
+end
+
 pathCell = regexp(path, pathsep, 'split');
 g = g(:);
-y = y(:);
-T = length(y);
 G = spdiags(ones(T,1)*[-g(end:-1:1)',1],-length(g):0,T,T);
 gd = max(roots([1,-g']));  % decay time constant for initial concentration
 gd_vec = gd.^((0:T-1)');
@@ -116,10 +133,10 @@ gd_vec = gd.^((0:T-1)');
 switch method
     case 'dual'
          v = G'*ones(T,1);
-        thr = sn*sqrt(T);
+        thr = sn*sqrt(T-sum(mis_data));
         if bas_est; b = 0; end
         if c1_est; c1 = 0; end
-        myfun = @(Ald) lagrangian_temporal_gradient(Ald,thr^2,y-b-c1*gd_vec,bas_est,c1_est);
+        myfun = @(Ald) lagrangian_temporal_gradient(Ald,thr^2,y(~mis_data)-b-c1*gd_vec(~mis_data),bas_est,c1_est);
         c = [G\max(G*y,0);zeros(bas_est);zeros(c1_est)];
         options_dual = optimset('GradObj','On','Display','Off','Algorithm','interior-point','TolX',1e-8);
         ld_in = 10;
@@ -140,7 +157,7 @@ switch method
             cin = zeros(1+options.resparse,1);
             w_ = ones(T,1);
             for rep = 1:options.resparse+1
-                [c(:,rep),bas(rep),cin(rep)] = cvx_foopsi(y,b,c1,sn,b_lb,g,w_);
+                [c(:,rep),bas(rep),cin(rep)] = cvx_foopsi(y,b,c1,sn,b_lb,g,w_,~mis_data);
                 sp(:,rep) = G*c(:,rep);                
                 w_ = 1./(max(sp(:,rep),0) + 1e-8);
             end
@@ -152,10 +169,10 @@ switch method
             error('CVX does not appear to be on the MATLAB path. It can be downloaded from cvxr.com \n');
         end
     case 'lars'
-         Ginv = [full(G\speye(T)),ones(T,bas_est),gd_vec*ones(1,c1_est)];
+         Ginv = E*[full(G\speye(T)),ones(T,bas_est),gd_vec*ones(1,c1_est)];
          if bas_est; b = 0; end
          if c1_est; c1 = 0; end    
-         [~, ~, spikes, ~, ~] = lars_regression_noise(y-b_lb*bas_est - b - c1*gd_vec, Ginv, 1, sn^2*T);
+         [~, ~, spikes, ~, ~] = lars_regression_noise(y(~mis_data)-b_lb*bas_est - b - c1*gd_vec(~mis_data), Ginv, 1, sn^2*(T-sum(mis_data)));
          sp = spikes(1:T);
          b = (spikes(T+bas_est)+b_lb)*bas_est + b*(1-bas_est);
          c1 = spikes(end)*c1_est + c1*(1-c1_est);
@@ -163,7 +180,7 @@ switch method
     case 'spgl1'
         onPath = ~isempty(strfind(pathCell, 'spgl1'));
         if onPath
-            Gx = @(x,mode) G_inv_mat(x,mode,T,g,gd_vec,bas_est,c1_est);
+            Gx = @(x,mode) G_inv_mat(x,mode,T,g,gd_vec,bas_est,c1_est,E);
             c = zeros(T,1+options.resparse);
             sp = zeros(T,1+options.resparse);
             bas = zeros(1+options.resparse,1);
@@ -173,8 +190,8 @@ switch method
                 if bas_est; b = 0; w_ = [w_;1e-10]; end
                 if c1_est; c1 = 0; w_ = [w_;1e-10]; end
                 options_spgl = spgSetParms('project',@NormL1NN_project ,'primal_norm', @NormL1NN_primal,'dual_norm',@NormL1NN_dual,'verbosity',0,'weights',w_);
-                [spikes,r,~,~] = spg_bpdn( Gx, y-b_lb*bas_est - (1-bas_est)*b-(1-c1_est)*c1*gd_vec, sn*sqrt(T),options_spgl);
-                c(:,rep) = Gx([spikes(1:T);0],1);                                  %% calcium signal
+                [spikes,r,~,~] = spg_bpdn( Gx, y(~mis_data)-b_lb*bas_est - (1-bas_est)*b-(1-c1_est)*c1*gd_vec(~mis_data), sn*sqrt(T-sum(mis_data)),options_spgl);
+                c(:,rep) = G\spikes(1:T); %Gx([spikes(1:T);0],1);                                  %% calcium signal
                 bas(rep) = b*(1-bas_est) + bas_est*spikes(T+bas_est)+b_lb*bas_est;       %% baseline
                 cin(rep) = c1*(1-c1_est) + c1_est*spikes(end);
                 sp(:,rep) = spikes(1:T);                                           %% spiking signal
@@ -305,11 +322,13 @@ end
         grad = -grad;
     end
 
-    function b = G_inv_mat(x,mode,NT,gs,gd_vec,bas_flag,c1_flag)
+    function b = G_inv_mat(x,mode,NT,gs,gd_vec,bas_flag,c1_flag,Emat)
         if mode == 1
             b = filter(1,[1;-gs(:)],x(1:NT)) + bas_flag*x(NT+bas_flag) + c1_flag*gd_vec*x(end);
+            b = Emat*b;
            %b = G\x(1:NT) + x(NT+bas_flag)*bas_flag + x(end)*c1_flag;
         elseif mode == 2
+            x = Emat'*x;
             b = [flipud(filter(1,[1;-gs(:)],flipud(x)));ones(bas_flag,1)*sum(x);ones(c1_flag,1)*(gd_vec'*x)];
            %b = [G'\x;ones(bas_flag,1)*sum(x);ones(c1_flag,1)*(gd_vec'*x)] ;
         end
