@@ -1,7 +1,6 @@
 # constrained-foopsi
 Implementation of the constrained deconvolution spike inference algorithm in Matlab.
 
-File constained_foopsi.m
  spike inference using a constrained foopsi approach:
       min      | sum(sp)    <br />
     c,sp,b,c1  |            <br />
@@ -11,6 +10,8 @@ File constained_foopsi.m
                  |   c1 >= 0          <br />
                  | ||y-b-c - c_in|| <= sn*sqrt(T)   <br />
 
+
+File constained_foopsi.m
    Variables: |   <br />
 ---------------|-----------------
    y:    |  raw fluorescence data (vector of length(T))     <br />
@@ -42,6 +43,10 @@ File constained_foopsi.m
 The noise is estimated with a power spectral density approach and the time constants from the signal autocovariance. 
 
 The algorithm can also handle missing data (appearing as NaNs in y) due to motion artifacts or for super-resolution approaches
+
+The algorithm is presented in more detail in
+
+Pnevmatikakis, E. A., Gao, Y., Soudry, D., Pfau, D., Lacefield, C., Poskanzer, K., ... & Paninski, L. (2014). A structured matrix factorization framework for large scale calcium imaging data analysis. arXiv preprint arXiv:1409.2903. http://arxiv.org/abs/1409.2903
 
 License
 =======
