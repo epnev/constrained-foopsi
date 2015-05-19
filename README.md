@@ -31,8 +31,7 @@ File constained_foopsi.m
    available methods: 'dual' uses dual ascent  <br />
                        'cvx' uses the cvx package available from cvxr.com (default)  <br />
                       'lars' uses the least regression algorithm   <br />
-                     'spgl1' uses the spgl1 package available from  <br />
-                     math.ucdavis.edu/~mpf/spgl1/  (usually fastest)  <br />
+                     'spgl1' uses the spgl1 package available from math.ucdavis.edu/~mpf/spgl1/  (usually fastest)  <br />
    bas_nonneg:   flag for setting the baseline lower bound. if 1, then b >= 0 else b >= min(y)   <br />
    noise_range:  frequency range over which the noise power is estimated. Default [Fs/4,Fs/2]  <br />
    noise_method: method to average the PSD in order to obtain a robust noise level estimate  <br />
@@ -41,6 +40,8 @@ File constained_foopsi.m
    
 
 The noise is estimated with a power spectral density approach and the time constants from the signal autocovariance. 
+
+The algorithm can also handle missing data (appearing as NaNs in y) due to motion artifacts or for super-resolution approaches
 
 License
 =======
