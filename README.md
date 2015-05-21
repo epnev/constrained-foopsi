@@ -1,14 +1,14 @@
 # constrained-foopsi
 Implementation of the constrained deconvolution spike inference algorithm in Matlab.
 
- spike inference using a constrained foopsi approach:
+ spike inference using a constrained foopsi approach:   <br />
       min      | sum(sp)    <br />
     c,sp,b,c1  |            <br />
-      subject to: | sp >= 0     <br />
-                 | b >= 0         <br />
-                 |  G*c = sp        <br />
-                 |   c1 >= 0          <br />
-                 | ||y-b-c - c_in|| <= sn*sqrt(T)   <br />
+      subject to:  sp|  >= 0     <br />
+                  b| >= 0         <br />
+                   G*c| = sp        <br />
+                    c1| >= 0          <br />
+                  ||y-b-c - c_in|| | <= sn*sqrt(T)   <br />
 
 
 File constained_foopsi.m
