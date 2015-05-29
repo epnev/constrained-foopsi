@@ -124,7 +124,7 @@ if strcmpi(method,'dual') && any(mis_data)
     method = 'cvx';
 end
 
-if options.resparse > 0 && (method =='dual' || method == 'lars')
+if options.resparse > 0 && (strcmpi(method,'dual') || strcmpi(method,'lars'))
     warning('Resparsening is not supported with chosen method. Switching to CVX');
     method = 'cvx';
 end
