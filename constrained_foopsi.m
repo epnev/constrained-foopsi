@@ -323,8 +323,8 @@ end
         f = v'*c(1:T);    
         grad = [sum((c(1:T)-y_raw + c(T+bas_flag)*bas_flag + c(end)*gd_vec*c1_flag).^2)-thr];
         f = f + Al(:)'*grad;
-        f = -f;
-        grad = -grad;
+        %f = -f;
+        %grad = -grad;
     end
 
     function b = G_inv_mat(x,mode,NT,gs,gd_vec,bas_flag,c1_flag,Emat)
