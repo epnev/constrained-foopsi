@@ -154,7 +154,7 @@ switch method
         c = c(1:T);
         sp = G*c;
     case 'cvx'
-        onPath = ~isempty(strfind(pathCell, 'cvx'));
+        onPath = ~isempty(which('cvx_begin'));
         if onPath
             c = zeros(T,1+options.resparse);
             sp = zeros(T,1+options.resparse);
@@ -183,7 +183,7 @@ switch method
          c1 = spikes(end)*c1_est + c1*(1-c1_est);
          c = G\sp;
     case 'spgl1'
-        onPath = ~isempty(strfind(pathCell, 'spgl1'));
+        onPath = ~isempty(which('spgl1'));
         if onPath
             Gx = @(x,mode) G_inv_mat(x,mode,T,g,gd_vec,bas_est,c1_est,E);
             c = zeros(T,1+options.resparse);
