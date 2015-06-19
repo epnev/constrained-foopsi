@@ -1,4 +1,4 @@
-function [c,b,c1] = cvx_mixed_foopsi(y,b,c1,sn,b_lb,g,w,keep)
+function [c,b,c1,sp] = cvx_mixed_foopsi(y,b,c1,sn,b_lb,g,w,keep)
 
 % implementation of constrained foopsi in CVX with multiple time constants
 % Written by Eftychios Pnevmatikakis
@@ -13,6 +13,7 @@ function [c,b,c1] = cvx_mixed_foopsi(y,b,c1,sn,b_lb,g,w,keep)
     else
         c1_est = 0;
     end
+    y = y(:);
     if iscell(g) % multiple time constants
         nt = length(g);
         T = length(y);
@@ -52,6 +53,10 @@ function [c,b,c1] = cvx_mixed_foopsi(y,b,c1,sn,b_lb,g,w,keep)
             sn = cvx_optval/sqrt(sum(keep));
         end
         c = c2;
+        sp = zeros(T,nt);
+        for i = 1:nt
+            sp(:,i) = G{i}*c2(:,i);
+        end
     else
         gd = max(roots([1,-g(:)']));
         T = length(y);
@@ -83,5 +88,6 @@ function [c,b,c1] = cvx_mixed_foopsi(y,b,c1,sn,b_lb,g,w,keep)
             sn = cvx_optval/sqrt(sum(keep));
         end
         c = c2;
+        sp = G*c2;
     end
 end

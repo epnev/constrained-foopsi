@@ -1,6 +1,6 @@
 function [tau_new, c_new, accept] = propose_new_time_constant(y,sp,tau_old,tau_min,tau_max,tau_std,sn,c1)
 
-% y:        data signal 
+% y:            data signal 
 % sp:           spiking signal
 % tau_old:      current time constant
 % tau_min:      lower bound
@@ -15,6 +15,8 @@ function [tau_new, c_new, accept] = propose_new_time_constant(y,sp,tau_old,tau_m
 
 ITER = 100;
 T = length(y);
+y = y(:);
+sp = sp(:);
 tau_old = sort(tau_old);
 tau_new = tau_old;
 p = length(tau_old);
@@ -48,9 +50,11 @@ for iter = 1:ITER
             tau_new(1) = tau_temp;
             GSP1 = GSP1_;
             c = c_;
-            accept(1) = accept(1) + 1
+            accept(1) = accept(1) + 1;
             logC = logC_;
             gr = gr_;
+        else
+            gr_ = gr;
         end    
     end
 
@@ -69,10 +73,17 @@ for iter = 1:ITER
         tau_new(p) = tau_temp;
         GSP2 = GSP2_;
         c = c_;
-        accept(p) = accept(p) + 1
+        accept(p) = accept(p) + 1;
         logC = logC_;
         gr = gr_;
         gd_vec = gd_vec_;
+    else
+        gr_ = gr;
+    end
+    if p == 1
+        tau_old = [0,tau_new];
+    else
+        tau_old = tau_new;
     end
 end
     c_new = c + c1*gd_vec;
@@ -81,7 +92,7 @@ end
         if gt == 0
             c_ = zeros(length(sp),1);
         else
-            c_ = filter(1,[1,-gt],sp);
+            c_ = filter(1,[1,-gt],sp)*gt;
         end
     end
 

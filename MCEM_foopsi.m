@@ -5,7 +5,7 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
     defoptions.TauStd = [0.2,2];
     defoptions.default_g = [0.6,0.9];
     
-    if nargin < 6; options.defoptions; end 
+    if nargin < 6; options = defoptions; end 
     if ~isfield(options,'dt'); options.dt = defoptions.dt; end
     if ~isfield(options,'MaxIter'); options.MaxIter = defoptions.MaxIter; end
     if ~isfield(options,'MaxInerIter'); options.MaxInerIter = defoptions.MaxInerIter; end
@@ -42,7 +42,7 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
     if p == 1        
         gr_(1) = 0;
         G1sp = zeros(T,1);
-    else
+    else        
         G1sp = make_G_matrix(T,gr_(1))\sp(:);
     end
     tau1_std = max(tau(1)/5,options.TauStd(1));
@@ -132,4 +132,9 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
     end
     g.g = g;
     g.TAU = tau_sam(:,3-p:2);
+    
+    
+    function G = make_G_matrix(T,g)
+        G = spdiags(ones(T,1)*[-g(end:-1:1)',1],-length(g):0,T,T);
+    end
 end
