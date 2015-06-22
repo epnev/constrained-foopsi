@@ -162,7 +162,7 @@ switch method
             cin = zeros(1+options.resparse,1);
             w_ = ones(T,1);
             for rep = 1:options.resparse+1
-                [c(:,rep),bas(rep),cin(rep)] = cvx_foopsi(y,b,c1,sn,b_lb,g,w_,~mis_data);
+                [c(:,rep),bas(rep),cin(rep),sn] = cvx_foopsi(y,b,c1,sn,b_lb,g,w_,~mis_data);
                 sp(:,rep) = G*c(:,rep);                
                 w_ = 1./(max(sp(:,rep),0) + 1e-8);
             end
@@ -171,7 +171,7 @@ switch method
             b = bas;
             c1 = cin;
         else
-            error('CVX does not appear to be on the MATLAB path. It can be downloaded from cvxr.com \n');
+            error('CVX does not appear to be on the MATLAB path. It can be downloaded from cvxr.com');
         end
     case 'lars'
          Ginv = E*[full(G\speye(T)),ones(T,bas_est),gd_vec*ones(1,c1_est)];

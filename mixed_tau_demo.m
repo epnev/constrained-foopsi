@@ -40,10 +40,9 @@ for iter = 1:ITER
         c_(:,rp(i)) = c_new;
         gr_(:,rp(i)) = exp(-1./tau_new(:));
         gn{rp(i)} = [sum(gr_(:,rp(i)));-prod(gr_(:,rp(i)))];
-        disp(accept)
+        %disp(accept)
     end
+    disp(gr_)
     [c_,b,c1,sp] = cvx_mixed_foopsi(y(:),0,[0;0],sn,0,gn,ones(T,1),true(T,1));
     disp(corr(spt,sp))
 end
-    
-

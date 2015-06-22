@@ -1,4 +1,4 @@
-function [c,b,c1] = cvx_foopsi(y,b,c1,sn,b_lb,g,w,keep)
+function [c,b,c1,sn] = cvx_foopsi(y,b,c1,sn,b_lb,g,w,keep)
 
 % implementation of constrained foopsi in CVX
 % Written by Eftychios Pnevmatikakis
