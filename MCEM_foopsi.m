@@ -52,6 +52,7 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
     tau_max = 2*tau(2);    
     gd_vec = max(gr_).^(0:T-1)';
     tau_sam = zeros(options.MaxIter,2);
+    sn_sam = zeros(options.MaxIter,1);
     for iter = 1:options.MaxIter
         TAU = zeros(options.MaxInerIter,2);
         for iner_iter = 1:options.MaxInerIter
@@ -123,8 +124,9 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
         tau_ = mean(TAU);
         tau_sam(iter,:) = tau_;
         gr_ = exp(dt*(-1./tau_));
-        %res = y(:)-c_(:)-b-c1*gd_vec;
-        %sn   = 1./sqrt(gamrnd(1+T/2,1/(0.1 + sum((res.^2)/2))));
+        res = y(:)-c_(:)-b-c1*gd_vec;
+        sn   = 1./sqrt(gamrnd(1+T/2,1/(0.1 + sum((res.^2)/2))));
+        sn_sam(iter) = sn;
         g = [sum(gr_);-prod(gr_)];
         [c,b,c1,~,sn,sp] = constrained_foopsi(y,[],[],g(1:p),sn,options);
         %disp(tauMoves);
@@ -132,7 +134,7 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
     end
     g.g = g;
     g.TAU = tau_sam(:,3-p:2);
-    
+    sn = sn_sam;
     
     function G = make_G_matrix(T,g)
         G = spdiags(ones(T,1)*[-g(end:-1:1)',1],-length(g):0,T,T);
