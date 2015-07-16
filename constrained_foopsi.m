@@ -34,7 +34,7 @@ function [c,b,c1,g,sn,sp] = constrained_foopsi(y,b,c1,g,sn,options)
 %   noise_method: method to average the PSD in order to obtain a robust noise level estimate
 %   lags:         number of extra autocovariance lags to be considered when estimating the time constants
 %   resparse:     number of times that the solution is resparsened (default 0). Currently available only with methods 'cvx', 'spgl'
-
+%   fudge_factor: scaling constant to reduce bias in the time constant estimation (default 1 - no scaling)
 
 % Written by Eftychios Pnevmatikakis 
 
@@ -45,6 +45,7 @@ defoptions.noise_range = [0.25,0.5];    % frequency range over which to estimate
 defoptions.noise_method = 'logmexp';    % method for which to estimate the noise level
 defoptions.lags = 5;                    % number of extra lags when computing the AR coefficients
 defoptions.resparse = 0;                % number of times to re-sparse solution
+defoptions.fudge_factor = 1;            % fudge factor for time constants
 
 if nargin < 6
     options = defoptions;
@@ -69,6 +70,7 @@ if ~isfield(options,'noise_range'); options.noise_range = defoptions.noise_range
 if ~isfield(options,'noise_method'); options.noise_method = defoptions.noise_method; end
 if ~isfield(options,'lags'); options.lags = defoptions.lags; end
 if ~isfield(options,'resparse'); options.resparse = defoptions.resparse; end
+if ~isfield(options,'fudge_factor'); options.fudge_factor = defoptions.fudge_factor; end
 
 method = options.method;    
 if isempty(b);
@@ -105,6 +107,11 @@ if isempty(g)
         g = estimate_time_constants(y,options.p,sn,options.lags);
     end
     %fprintf('Stable AR(%i) model found \n',options.p);
+    if options.fudge_factor < 1     % re-adjust time constant values
+        rg = roots([1;-g(:)]);
+        pg = poly(options.fudge_factor*rg);
+        g = -pg(2:end);
+    end    
 end
 if options.bas_nonneg  % lower bound for baseline
     b_lb = 0;
@@ -247,70 +254,6 @@ end
         A = toeplitz(xc(lags+(1:lags)),xc(lags+(1:p))) - sn^2*eye(lags,p);
         g = pinv(A)*xc(lags+2:end);            
     end
-
-
-%     function Zin = plain_foopsi(H,D,I_est,eps)
-% 
-%         % solves argmin ||X-H||^2 subject to D*X>=0 with an interior point method
-%         % using I_est as the initial value and eps as the initial barrier weight
-% 
-%         ln = length(H);
-%         step_back_frac = 0.5;
-%         iter = 0;
-%         if nargin == 2
-%             I_est = 1e-3*ones(ln,1);
-%             eps = 1;
-%         end
-%         Zin = I_est(:);
-% 
-%         if nargin == 3
-%             eps = 1;
-%         end
-%         while eps>1e-8
-%             n = D*Zin;
-%             nnd = 10;
-%             E = norm(Zin-H)^2 - eps*sum(log(D*Zin));
-%             grad = 2*(Zin-H) - eps*D'*(n.^(-1));
-%             Hs = 2*speye(ln) + eps*D'*spdiags(n.^(-2),0,ln,ln)*D;          
-%             while nnd/2>1
-%                 iter = iter + 1;
-%                 Z_dir = -Hs\grad;
-%                 hit = -n./(D*Z_dir);
-%                 if all(hit<0)
-%                     s = 1;
-%                 else
-%                     s = min(1,.9*min(hit(hit>=0)));
-%                 end
-%                 E_new = E; s = s/step_back_frac;
-%                 x_dg = grad'*Z_dir;
-%                 while E_new > E + 0.25*s*x_dg
-%                     s=s*step_back_frac; 
-%                     Z_new = Zin + s*Z_dir;
-%                     n = D*Zin;
-%                     E_new = norm(Z_new-H)^2 - eps*sum(log(D*Z_new));
-%                 end
-%                 %E = E_new;
-%                 Zin = Zin + s*Z_dir;
-%                 nnd = -x_dg;
-%                 E = norm(Zin-H)^2 - eps*sum(log(D*Zin));
-%                 n = D*Zin;
-%                 grad = 2*(Zin-H) - eps*D'*(n.^(-1));
-%                 Hs = 2*speye(ln) + eps*D'*spdiags(n.^(-2),0,ln,ln)*D;
-%             end
-%             eps = eps/10;
-%         end
-%     end
-    
-%     function [f,grad] = lagrangian_temporal_grad(Al,thr,y_raw)
-%         %options2 = optimset('Display','Off','Algorithm','interior-point-convex');
-%         %c = quadprog(2*sum(Al.*(a.^2))*speye(T),v-2*((la>1)*sum(spdiags(Al.*a,0,la,la)*y,1)' + (la==1)*y'*(Al.*a)),-G,zeros(T,1),[],[],[],[],[],options2);
-%         c = plain_foopsi((y_raw*(Al)-v/2)/sum(Al),G);
-%         f = v'*c;    
-%         grad = (sum((c-y_raw).^2)-thr);
-%         f = f + Al(:)'*grad;
-%         f = -f;
-%         grad = -grad;
-%     end
 
     function [f,grad] = lagrangian_temporal_gradient(Al,thr,y_raw,bas_flag,c1_flag)
         options_qp = optimset('Display','Off','Algorithm','interior-point-convex');
