@@ -109,6 +109,9 @@ if isempty(g)
     %fprintf('Stable AR(%i) model found \n',options.p);
     if options.fudge_factor < 1     % re-adjust time constant values
         rg = roots([1;-g(:)]);
+        if ~isreal(rg); rg = real(rg); end
+        rg(rg>1) = 0.95;
+        rg(rg<0) = 0.15;
         pg = poly(options.fudge_factor*rg);
         g = -pg(2:end);
     end    
