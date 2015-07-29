@@ -252,7 +252,16 @@ end
         % estimate time constants from autocorrelation function
         
         lags = lags + p;
-        xc = xcov(y,lags,'biased');
+        if ~isempty(which('xcov')) %signal processing toolbox
+            xc = xcov(y,lags,'biased');
+        else
+            ynormed = (y - mean(y));
+            xc = nan(lags + 1, 1);
+            for k = 0:lags
+                xc(k + 1) = ynormed(1 + k:end)' * ynormed(1:end - k);
+            end
+            xc = [flipud(xc(2:end)); xc] / numel(y);
+        end
         xc = xc(:);
         A = toeplitz(xc(lags+(1:lags)),xc(lags+(1:p))) - sn^2*eye(lags,p);
         g = pinv(A)*xc(lags+2:end);            
