@@ -48,6 +48,10 @@ The algorithm is presented in more detail in
 
 Pnevmatikakis, E. A., Gao, Y., Soudry, D., Pfau, D., Lacefield, C., Poskanzer, K., ... & Paninski, L. (2014). A structured matrix factorization framework for large scale calcium imaging data analysis. arXiv preprint arXiv:1409.2903. http://arxiv.org/abs/1409.2903
 
+Toolbox Dependencies
+=======
+The signal processing toolbox is optional. If present it is used for computing the power spectral density and the autocovariance function.
+
 License
 =======
 
