@@ -36,7 +36,8 @@ function [c,b,c1,g,sn,sp] = constrained_foopsi(y,b,c1,g,sn,options)
 %   resparse:     number of times that the solution is resparsened (default 0). Currently available only with methods 'cvx', 'spgl'
 %   fudge_factor: scaling constant to reduce bias in the time constant estimation (default 1 - no scaling)
 
-% Written by Eftychios Pnevmatikakis 
+% Written by:
+% Eftychios A. Pnevmatikakis, Simons Foundation, 2015 
 
 defoptions.p = 2;
 defoptions.method = 'cvx';
@@ -278,8 +279,6 @@ end
         f = v'*c(1:T);    
         grad = [sum((c(1:T)-y_raw + c(T+bas_flag)*bas_flag + c(end)*gd_vec*c1_flag).^2)-thr];
         f = f + Al(:)'*grad;
-        %f = -f;
-        %grad = -grad;
     end
 
     function b = G_inv_mat(x,mode,NT,gs,gd_vec,bas_flag,c1_flag,Emat)
