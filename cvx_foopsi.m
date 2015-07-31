@@ -29,7 +29,7 @@ function [c,b,c1] = cvx_foopsi(y,b,c1,sn,b_lb,g,w,keep)
             if c1_est; c1>=0; end
     cvx_end
     if strcmpi(cvx_status,'Infeasible');
-        disp('Problem is infeasible, adjusting noise value.');
+        %disp('Problem is infeasible, adjusting noise value.');
         cvx_begin quiet
             variable c2(T)
             if bas_est; variable b; end
