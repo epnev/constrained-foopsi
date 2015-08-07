@@ -250,7 +250,7 @@ end
 
     
     function g = estimate_time_constants(y,p,sn,lags)
-        % estimate time constants from autocorrelation function
+        % estimate time constants from the sample autocovariance function
         
         lags = lags + p;
         if ~isempty(which('xcov')) %signal processing toolbox
