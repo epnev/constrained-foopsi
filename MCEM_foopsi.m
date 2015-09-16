@@ -5,7 +5,7 @@ function [c,b,c1,g,sn,sp] = MCEM_foopsi(y,b,c1,g,sn,options)
     defoptions.TauStd = [0.2,2];
     defoptions.default_g = [0.6,0.9];
     
-    if nargin < 6; options.defoptions; end 
+    if nargin < 6; options = defoptions; end 
     if ~isfield(options,'dt'); options.dt = defoptions.dt; end
     if ~isfield(options,'MaxIter'); options.MaxIter = defoptions.MaxIter; end
     if ~isfield(options,'MaxInerIter'); options.MaxInerIter = defoptions.MaxInerIter; end
