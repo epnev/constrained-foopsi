@@ -102,20 +102,19 @@ if isempty(sn)
 end
 if isempty(g)
     g = estimate_time_constants(y_full,options.p,sn,options.lags);
-    while max(abs(roots([1,-g(:)']))>1)
+    while max(abs(roots([1,-g(:)']))>1) && options.p < 5
         warning('No stable AR(%i) model found. Checking for AR(%i) model \n',options.p,options.p+1);
         options.p = options.p + 1;
         g = estimate_time_constants(y,options.p,sn,options.lags);
     end
     %fprintf('Stable AR(%i) model found \n',options.p);
-    if options.fudge_factor < 1     % re-adjust time constant values
-        rg = roots([1;-g(:)]);
-        if ~isreal(rg); rg = real(rg); end
-        rg(rg>1) = 0.95;
-        rg(rg<0) = 0.15;
-        pg = poly(options.fudge_factor*rg);
-        g = -pg(2:end);
-    end    
+    % re-adjust time constant values
+    rg = roots([1;-g(:)]);
+    if ~isreal(rg); rg = real(rg); end
+    rg(rg>1) = 0.95;
+    rg(rg<0) = 0.15;
+    pg = poly(options.fudge_factor*rg);
+    g = -pg(2:end);
 end
 if options.bas_nonneg  % lower bound for baseline
     b_lb = 0;
