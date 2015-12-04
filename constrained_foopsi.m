@@ -107,12 +107,15 @@ if isempty(g)
         options.p = options.p + 1;
         g = estimate_time_constants(y,options.p,sn,options.lags);
     end
+    if options.p == 5
+        g = 0;
+    end
     %fprintf('Stable AR(%i) model found \n',options.p);
     % re-adjust time constant values
     rg = roots([1;-g(:)]);
-    if ~isreal(rg); rg = real(rg); end
-    rg(rg>1) = 0.95;
-    rg(rg<0) = 0.15;
+    if ~isreal(rg); rg = real(rg) + .001*randn(size(rg)); end
+    rg(rg>1) = 0.95 + 0.001*randn(size(rg(rg>1)));
+    rg(rg<0) = 0.15 + 0.001*randn(size(rg(rg<0)));
     pg = poly(options.fudge_factor*rg);
     g = -pg(2:end);
 end
